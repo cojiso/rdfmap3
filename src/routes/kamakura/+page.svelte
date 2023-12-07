@@ -80,24 +80,24 @@ onMount(() => {
         WHERE {
                 SERVICE <http://virtuoso.orbit.supply:8890/sparql> {
                     ?photoObject
+                        rdfs:label ?label ;
                         jps:spatial ?location .
                     ?location schema:geo [
                         schema:latitude ?lat ;
                         schema:longitude ?lon
                     ] .
                     FILTER(${bounds.getSouth()} <= ?lat && ?lat <= ${bounds.getNorth()} && ${bounds.getWest()} <= ?lon && ?lon <= ${bounds.getEast()})
-                } .
+                }
                 ?photoObject
                     jps:sourceInfo/schema:provider <https://jpsearch.go.jp/entity/chname/鎌倉市図書館近代史資料室> ;
-                    rdfs:label ?label ;
                     schema:image ?image ;
                     jps:accessInfo/schema:license ?licenseUri .
                 ?licenseUri rdfs:label ?license .
-                OPTIONAL { ?photoObject schema:creator ?creatorUriOP . } .
-                    BIND(COALESCE(?creatorUriOP, "./") AS ?creatorUri)
-                OPTIONAL { ?creatorUri rdfs:label ?creatorOP . } .
+                OPTIONAL { ?photoObject schema:creator ?creatorUriOP . }
+                    BIND(COALESCE(?creatorUriOP, "https://jpsearch.go.jp/entity/chname/鎌倉市中央図書館") AS ?creatorUri)
+                OPTIONAL { ?creatorUri rdfs:label ?creatorOP . }
                     BIND(COALESCE(?creatorOP, "不明") AS ?creator)
-                OPTIONAL { ?photoObject jps:temporal/rdfs:label ?timeOP . } .
+                OPTIONAL { ?photoObject jps:temporal/rdfs:label ?timeOP . }
                     BIND(COALESCE(?timeOP, "不明") AS ?time)
         } LIMIT 20
         `;
@@ -123,6 +123,17 @@ onMount(() => {
             // const lonlat = obj.location.value.match(/^Point\((?<lon>.+) (?<lat>.+)\)$/);
             // const lonlat = obj.location.value
             // if (!lonlat) return;
+            console.log(obj);
+            
+            let objWrap = {"photoObject":"", "label":"", "image":"", "location":"", "lat":"", "lon":"", "creatorUri":"", "creator":"", "time":"", "license":"", "licenseUri":""}
+            const vlist = ["photoObject", "label", "image", "location", "lat", "lon", "creatorUri", "creator", "time", "license", "licenseUri"]
+            vlist.forEach((v: string) => {
+                objWrap[v] = "不明"
+                if (obj.v !== undefined) {
+                    objWrap[v] = obj.v.Value
+                }
+            })
+
             if (obj.location.value === undefined) return;
             // const lon = parseFloat(lonlat.groups.lon);
             // const lat = parseFloat(lonlat.groups.lat);
@@ -151,7 +162,7 @@ onMount(() => {
                                     <tr><th>Property</th><th>Value</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr><th>撮影者</th><td><a href="${obj.creatorUri.value}">${obj.creator.value}</a></td></tr>
+                                    <tr><th>撮影者</th><td><a href="${objWrap["creatorUri"]}">${obj.creator.value}</a></td></tr>
                                     <tr><th>撮影年</th><td>${obj.time.value}</td></tr>
                                     <tr><th>ライセンス</th><td><a href="${obj.licenseUri.value}">${obj.license.value}</a></td></tr>
                                 </tbody>
@@ -188,7 +199,7 @@ onMount(() => {
                     })
                     .addTo(group)
                     .bindPopup(popup, {
-                        className: 'card w-96 bg-base-100 shadow-xl',
+                        className: 'card w-full sm:w-96 shadow-xl',
                         maxWidth: "auto",
                         minWidth: "auto",
                         autoPan: true
@@ -289,6 +300,11 @@ onMount(() => {
 #map :global(.leaflet-popup-content-wrapper) {
     padding: 0;
     overflow: hidden;
+    /* transform-origin: bottom; */
+    max-height: 100vh;
+}
+#map :global(.leaflet-popup-content-wrapper) :global(img) {
+    max-height: 40vh;
 }
 #map :global(.leaflet-popup-content) {
     margin: 0;
@@ -296,6 +312,8 @@ onMount(() => {
 #map :global(.card) {
     position: absolute;
     display: block;
+    /* top: 50%; */
+    /* transform: translateY(-100%); */
 }
 #map :global(.chipdd) {
     width: 380px;
