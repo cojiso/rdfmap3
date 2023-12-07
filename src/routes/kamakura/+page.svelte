@@ -76,7 +76,7 @@ onMount(() => {
     map.on("moveend", async function() {
         let bounds = map.getBounds();
         let sparql =`
-        SELECT ?photoObject ?label ?image ?location ?lat ?lon ?creatorUri ?creator ?time ?license ?licenseUri
+        SELECT ?photoObject ?label ?image ?location ?lat ?lon ?creatorRole ?creatorUri ?creator ?time ?provider ?license ?licenseUri ?usageInfo
         WHERE {
                 SERVICE <http://virtuoso.orbit.supply:8890/sparql> {
                     ?photoObject
@@ -91,15 +91,20 @@ onMount(() => {
                 ?photoObject
                     jps:sourceInfo/schema:provider <https://jpsearch.go.jp/entity/chname/鎌倉市図書館近代史資料室> ;
                     schema:image ?image ;
+                    jps:accessInfo/schema:provider/rdfs:label ?provider ;
+                    jps:accessInfo/schema:usageInfo ?usageInfo ;
                     jps:accessInfo/schema:license ?licenseUri .
                 ?licenseUri rdfs:label ?license .
-                OPTIONAL { ?photoObject schema:creator ?creatorUriOP . }
-                    BIND(COALESCE(?creatorUriOP, "https://jpsearch.go.jp/entity/chname/鎌倉市中央図書館") AS ?creatorUri)
-                OPTIONAL { ?creatorUri rdfs:label ?creatorOP . }
+
+                OPTIONAL { ?photoObject jps:agential/jps:relationType/rdfs:label ?creatorRoleOP }
+                    BIND(COALESCE(?creatorRoleOP, "作成") AS ?creatorRole)
+                OPTIONAL { ?photoObject jps:agential/jps:value ?creatorUriOP }
+                    BIND(COALESCE(?creatorUriOP, ?photoObject) AS ?creatorUri)
+                OPTIONAL { ?creatorUriOP rdfs:label ?creatorOP }
                     BIND(COALESCE(?creatorOP, "不明") AS ?creator)
-                OPTIONAL { ?photoObject jps:temporal/rdfs:label ?timeOP . }
+                OPTIONAL { ?photoObject jps:temporal/rdfs:label ?timeOP }
                     BIND(COALESCE(?timeOP, "不明") AS ?time)
-        } LIMIT 20
+        } LIMIT 1200
         `;
 
         group.eachLayer((layer: any) => {
@@ -123,22 +128,25 @@ onMount(() => {
             // const lonlat = obj.location.value.match(/^Point\((?<lon>.+) (?<lat>.+)\)$/);
             // const lonlat = obj.location.value
             // if (!lonlat) return;
-            console.log(obj);
+            // console.log(obj);
             
-            let objWrap = {"photoObject":"", "label":"", "image":"", "location":"", "lat":"", "lon":"", "creatorUri":"", "creator":"", "time":"", "license":"", "licenseUri":""}
-            const vlist = ["photoObject", "label", "image", "location", "lat", "lon", "creatorUri", "creator", "time", "license", "licenseUri"]
-            vlist.forEach((v: string) => {
-                objWrap[v] = "不明"
-                if (obj.v !== undefined) {
-                    objWrap[v] = obj.v.Value
+            let objWrap: { [key: string]: any; } = {photoObject:"", label:"", image:"", location:"", lat:"", lon:"", creatorRole:"", creatorUri:"", creator:"", usageInfo:"", time:"", provider:"", license:"", licenseUri:""}
+            Object.keys(objWrap).forEach((v: string) => {
+                if (obj[v] !== undefined) {
+                    objWrap[v] = obj[v]["value"]
+                    
+                } else {
+                    objWrap[v] = "不明"
                 }
             })
+            
 
             if (obj.location.value === undefined) return;
             // const lon = parseFloat(lonlat.groups.lon);
             // const lat = parseFloat(lonlat.groups.lat);
-            const lon = obj.lon.value
-            const lat = obj.lat.value
+            const lon = objWrap.lon
+            const lat = objWrap.lat
+            
             const locationId = obj.photoObject.value.match(/\/data\/(.+)$/)[0]
             // let time = "不明"
             // if (obj.time !== undefined) {
@@ -162,9 +170,9 @@ onMount(() => {
                                     <tr><th>Property</th><th>Value</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr><th>撮影者</th><td><a href="${objWrap["creatorUri"]}">${obj.creator.value}</a></td></tr>
-                                    <tr><th>撮影年</th><td>${obj.time.value}</td></tr>
-                                    <tr><th>ライセンス</th><td><a href="${obj.licenseUri.value}">${obj.license.value}</a></td></tr>
+                                    <tr><th>${objWrap.creatorRole}</th><td><a href="${objWrap.creatorUri}">${objWrap.creator}</a></td></tr>
+                                    <tr><th>撮影年</th><td>${objWrap.time}</td></tr>
+                                    <tr><th><a href="${objWrap.licenseUri}">${objWrap.license}</a></th><td><a href="${objWrap.usageInfo}">${objWrap.provider}</a></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -302,6 +310,7 @@ onMount(() => {
     overflow: hidden;
     /* transform-origin: bottom; */
     max-height: 100vh;
+
 }
 #map :global(.leaflet-popup-content-wrapper) :global(img) {
     max-height: 40vh;
